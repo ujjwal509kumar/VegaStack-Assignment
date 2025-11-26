@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate, AuthenticatedRequest } from '@/lib/middleware';
 import { supabaseAdmin } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png'];
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg'];
 
 async function uploadHandler(req: AuthenticatedRequest) {
   try {
@@ -35,38 +36,62 @@ async function uploadHandler(req: AuthenticatedRequest) {
       );
     }
 
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop();
+    // Generate unique filename with public folder to match RLS policy
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
     const fileName = `${req.user!.userId}-${Date.now()}.${fileExt}`;
-    const filePath = `${bucket}/${fileName}`;
+    const filePath = `public/${fileName}`; // Use public folder to match RLS policy
 
     // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabaseAdmin.storage
+    // Ensure we're using service role key
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!serviceKey) {
+      return NextResponse.json(
+        { error: 'Storage configuration error. Please contact administrator.' },
+        { status: 500 }
+      );
+    }
+
+    // Create admin client with service role key (bypasses RLS)
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    // Upload to Supabase Storage using service role (bypasses RLS)
+    const { data, error: uploadError } = await adminClient.storage
       .from(bucket)
       .upload(filePath, buffer, {
         contentType: file.type,
-        upsert: false,
+        upsert: true, // Allow overwriting
+        cacheControl: '3600',
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
-      return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to upload image', 
+        details: uploadError.message 
+      }, { status: 500 });
     }
 
     // Get public URL
-    const { data: urlData } = supabaseAdmin.storage.from(bucket).getPublicUrl(filePath);
+    const { data: urlData } = adminClient.storage.from(bucket).getPublicUrl(filePath);
 
     return NextResponse.json({
       message: 'Image uploaded successfully',
       url: urlData.publicUrl,
     });
-  } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error?.message || 'Unknown error'
+    }, { status: 500 });
   }
 }
 
