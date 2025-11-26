@@ -2,6 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  Shield, 
+  Users, 
+  FileText, 
+  Activity,
+  UserCog,
+  FileEdit
+} from 'lucide-react';
+import AppLayout from '@/components/AppLayout';
+import toast from 'react-hot-toast';
 
 interface Stats {
   totalUsers: number;
@@ -25,7 +39,7 @@ export default function AdminPage() {
 
     const userData = JSON.parse(user);
     if (userData.role !== 'ADMIN') {
-      alert('Access denied. Admin only.');
+      toast.error('Access denied. Admin only.');
       router.push('/dashboard');
       return;
     }
@@ -44,57 +58,133 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-muted-foreground">Loading admin dashboard...</div>
       </div>
     );
   }
 
+  const statCards = [
+    {
+      title: 'Total Users',
+      value: stats?.totalUsers || 0,
+      icon: Users,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+      description: 'Registered users'
+    },
+    {
+      title: 'Total Posts',
+      value: stats?.totalPosts || 0,
+      icon: FileText,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+      description: 'Published posts'
+    },
+    {
+      title: 'Active Today',
+      value: stats?.activeToday || 0,
+      icon: Activity,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
+      description: 'Active users today'
+    },
+  ];
+
+  const managementCards = [
+    {
+      title: 'User Management',
+      description: 'View, activate, deactivate, and manage all users',
+      icon: UserCog,
+      href: '/admin/users',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    },
+    {
+      title: 'Post Management',
+      description: 'View, moderate, and manage all posts and content',
+      icon: FileEdit,
+      href: '/admin/posts',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold">Admin Dashboard</h1>
-            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">
-              ← Back to Dashboard
-            </a>
+    <AppLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-8"
+        >
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage users, posts, and monitor platform activity
+            </p>
           </div>
-        </div>
-      </nav>
 
-      <main className="max-w-7xl mx-auto py-6 px-4">
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Total Users</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stats?.totalUsers || 0}</p>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {statCards.map((stat, index) => (
+              <motion.div
+                key={stat.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className="border-2">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">{stat.title}</p>
+                        <p className="text-3xl font-bold mb-1">{stat.value}</p>
+                        <p className="text-xs text-muted-foreground">{stat.description}</p>
+                      </div>
+                      <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
+                        <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Total Posts</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stats?.totalPosts || 0}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Active Today</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stats?.activeToday || 0}</p>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <a
-            href="/admin/users"
-            className="block bg-white rounded-lg shadow p-6 hover:shadow-lg transition"
-          >
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">👥 User Management</h3>
-            <p className="text-gray-600">View and manage all users</p>
-          </a>
-          <a
-            href="/admin/posts"
-            className="block bg-white rounded-lg shadow p-6 hover:shadow-lg transition"
-          >
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">📝 Post Management</h3>
-            <p className="text-gray-600">View and moderate all posts</p>
-          </a>
-        </div>
-      </main>
-    </div>
+          {/* Management Cards */}
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Management Tools</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {managementCards.map((card, index) => (
+                <motion.div
+                  key={card.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + index * 0.1 }}
+                >
+                  <Link href={card.href}>
+                    <Card className="h-full hover:shadow-xl transition-all duration-300 border-2 cursor-pointer group">
+                      <CardContent className="p-6">
+                        <div className="flex items-start gap-4">
+                          <div className={`w-12 h-12 ${card.bgColor} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                            <card.icon className={`w-6 h-6 ${card.color}`} />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold mb-1">{card.title}</h3>
+                            <p className="text-sm text-muted-foreground">{card.description}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </AppLayout>
   );
 }

@@ -32,13 +32,18 @@ async function listUsersHandler(req: AuthenticatedRequest) {
       // Regular users can search/discover users
       const { users, total } = await db.admin.listUsers(page, limit);
       
-      // Filter out sensitive info for non-admin
+      // Filter out sensitive info for non-admin but include profile data
       const publicUsers = users.map((user: any) => ({
         id: user.id,
         username: user.username,
         first_name: user.first_name,
         last_name: user.last_name,
+        role: user.role,
         created_at: user.created_at,
+        profile: user.profile ? {
+          bio: user.profile.bio,
+          avatar_url: user.profile.avatar_url,
+        } : undefined,
       }));
 
       return NextResponse.json({

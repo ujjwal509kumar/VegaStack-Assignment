@@ -2,6 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Shield,
+  MessageCircle,
+  Heart,
+  Home,
+  PenSquare,
+  Users,
+  UserCircle
+} from 'lucide-react';
+import AppLayout from '@/components/AppLayout';
 
 interface User {
   id: string;
@@ -48,7 +64,6 @@ export default function DashboardPage() {
         if (res.status === 401) {
           const data = await res.json().catch(() => ({}));
           if (data.shouldLogout || data.error?.includes('Invalid') || data.error?.includes('tampered')) {
-            console.error('Token is invalid or tampered - logging out');
             localStorage.clear();
             router.push('/login');
             return;
@@ -59,7 +74,6 @@ export default function DashboardPage() {
       .then((data) => {
         if (data && data.stats) {
           setUser((prev) => prev ? { ...prev, stats: data.stats } : null);
-          // Update localStorage with fresh stats
           const updatedUser = { ...parsedUser, stats: data.stats };
           localStorage.setItem('user', JSON.stringify(updatedUser));
         }
@@ -67,151 +81,160 @@ export default function DashboardPage() {
       .catch((err) => console.error('Failed to fetch stats:', err));
   }, [router]);
 
-  const handleLogout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    const accessToken = localStorage.getItem('accessToken');
-
-    if (refreshToken && accessToken) {
-      try {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ refreshToken }),
-        });
-      } catch (err) {
-        console.error('Logout error:', err);
-      }
-    }
-
-    localStorage.clear();
-    router.push('/');
-  };
-
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
+  const quickActions = [
+    {
+      title: 'Feed',
+      description: 'View posts from people you follow',
+      icon: Home,
+      href: '/feed',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    },
+    {
+      title: 'Create Post',
+      description: 'Share something with your followers',
+      icon: PenSquare,
+      href: '/posts/create',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    },
+    {
+      title: 'My Profile',
+      description: 'Edit your profile information',
+      icon: UserCircle,
+      href: '/profile',
+      color: 'text-green-600',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
+    },
+    {
+      title: 'Discover',
+      description: 'Find and follow other users',
+      icon: Users,
+      href: '/users',
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100 dark:bg-orange-900/30',
+    },
+  ];
+
+  const stats = [
+    { label: 'Posts', value: user.stats.postsCount, icon: MessageCircle, color: 'text-blue-600' },
+    { label: 'Followers', value: user.stats.followersCount, icon: Users, color: 'text-purple-600' },
+    { label: 'Following', value: user.stats.followingCount, icon: Heart, color: 'text-pink-600' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">SocialConnect</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              {user.role === 'ADMIN' && (
-                <a
-                  href="/admin"
-                  className="px-4 py-2 text-sm font-medium text-purple-700 hover:text-purple-900"
+    <AppLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-6"
+        >
+          {/* Welcome Section */}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              Welcome back, {user.firstName}!
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Here's what's happening with your account today
+            </p>
+          </div>
+
+          {/* Profile Card */}
+          <Card className="border shadow-lg">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-2 flex-shrink-0">
+                  <AvatarImage src={user.profile?.avatar_url} alt={user.firstName} />
+                  <AvatarFallback className="text-2xl font-semibold bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+                    {user.firstName[0]}{user.lastName[0]}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-xl sm:text-2xl font-bold">
+                      {user.firstName} {user.lastName}
+                    </h2>
+                    {user.role === 'ADMIN' && (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Admin
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground">@{user.username}</p>
+                  {user.profile?.bio && (
+                    <p className="text-sm text-foreground/80 mt-2">{user.profile.bio}</p>
+                  )}
+                </div>
+              </div>
+
+              <Separator className="my-4 sm:my-6" />
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                {stats.map((stat, index) => (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="text-center p-2 sm:p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1">
+                      <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
+                      <p className="text-2xl sm:text-3xl font-bold">{stat.value}</p>
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase">{stat.label}</p>
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {quickActions.map((action, index) => (
+                <motion.div
+                  key={action.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
                 >
-                  Admin Panel
-                </a>
-              )}
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="flex items-start gap-4 mb-4">
-              {user.profile?.avatar_url && (
-                <img 
-                  src={user.profile.avatar_url} 
-                  alt={`${user.firstName} ${user.lastName}`}
-                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-                />
-              )}
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Welcome, {user.firstName} {user.lastName}!
-                </h2>
-                {user.profile?.bio && (
-                  <p className="text-gray-600 mt-2">{user.profile.bio}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600">Username</p>
-                <p className="text-lg font-medium text-gray-900">@{user.username}</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="text-lg font-medium text-gray-900">{user.email}</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-600">Role</p>
-                <p className="text-lg font-medium text-gray-900">{user.role}</p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{user.stats.postsCount}</p>
-                  <p className="text-sm text-gray-600">Posts</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{user.stats.followersCount}</p>
-                  <p className="text-sm text-gray-600">Followers</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{user.stats.followingCount}</p>
-                  <p className="text-sm text-gray-600">Following</p>
-                </div>
-              </div>
+                  <Link href={action.href}>
+                    <Card className="h-full hover:shadow-lg transition-all duration-300 border cursor-pointer group">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 ${action.bgColor} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                            <action.icon className={`w-6 h-6 sm:w-7 sm:h-7 ${action.color}`} />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm sm:text-base">{action.title}</h3>
+                            <p className="text-xs text-muted-foreground hidden sm:block mt-1">{action.description}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            <a
-              href="/feed"
-              className="block p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
-            >
-              <h3 className="font-semibold text-blue-900">📰 Feed</h3>
-              <p className="text-sm text-blue-700">View posts from people you follow</p>
-            </a>
-            <a
-              href="/posts/create"
-              className="block p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100"
-            >
-              <h3 className="font-semibold text-green-900">✍️ Create Post</h3>
-              <p className="text-sm text-green-700">Share something with your followers</p>
-            </a>
-            <a
-              href="/profile"
-              className="block p-4 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100"
-            >
-              <h3 className="font-semibold text-purple-900">👤 My Profile</h3>
-              <p className="text-sm text-purple-700">Edit your profile information</p>
-            </a>
-            <a
-              href="/users"
-              className="block p-4 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100"
-            >
-              <h3 className="font-semibold text-orange-900">👥 Discover Users</h3>
-              <p className="text-sm text-orange-700">Find and follow other users</p>
-            </a>
-          </div>
-        </div>
-      </main>
-    </div>
+        </motion.div>
+      </div>
+    </AppLayout>
   );
 }

@@ -40,43 +40,10 @@ export default function NotificationProvider({ children }: { children: React.Rea
         // Show toast notification
         const icon = getNotificationIcon(notification.type);
         
-        toast.custom(
-          (t) => (
-            <div
-              className={`${
-                t.visible ? 'animate-enter' : 'animate-leave'
-              } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-            >
-              <div className="flex-1 w-0 p-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 pt-0.5">
-                    <span className="text-2xl">{icon}</span>
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {getNotificationTitle(notification.type)}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {notification.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex border-l border-gray-200">
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          ),
-          {
-            duration: 5000,
-            position: 'top-right',
-          }
-        );
+        toast(notification.message, {
+          icon: icon,
+          duration: 5000,
+        });
 
         // Play notification sound (optional)
         playNotificationSound();
@@ -92,7 +59,57 @@ export default function NotificationProvider({ children }: { children: React.Rea
 
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'hsl(var(--background))',
+            color: 'hsl(var(--foreground))',
+            border: '2px solid hsl(var(--border))',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            fontSize: '15px',
+            fontWeight: '500',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            maxWidth: '500px',
+            minWidth: '300px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#ffffff',
+            },
+            style: {
+              background: 'hsl(var(--background))',
+              border: '2px solid #10b981',
+              boxShadow: '0 20px 25px -5px rgba(16, 185, 129, 0.2), 0 10px 10px -5px rgba(16, 185, 129, 0.1)',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#ffffff',
+            },
+            style: {
+              background: 'hsl(var(--background))',
+              border: '2px solid #ef4444',
+              boxShadow: '0 20px 25px -5px rgba(239, 68, 68, 0.2), 0 10px 10px -5px rgba(239, 68, 68, 0.1)',
+            },
+          },
+          loading: {
+            iconTheme: {
+              primary: '#3b82f6',
+              secondary: '#ffffff',
+            },
+            style: {
+              background: 'hsl(var(--background))',
+              border: '2px solid #3b82f6',
+              boxShadow: '0 20px 25px -5px rgba(59, 130, 246, 0.2), 0 10px 10px -5px rgba(59, 130, 246, 0.1)',
+            },
+          },
+        }}
+      />
       {children}
     </>
   );

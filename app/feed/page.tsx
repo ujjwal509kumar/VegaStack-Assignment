@@ -2,6 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+
+import { Badge } from '@/components/ui/badge';
+import { 
+  Heart, 
+  MessageCircle,
+  Send,
+  ImageIcon
+} from 'lucide-react';
+import AppLayout from '@/components/AppLayout';
 
 interface Post {
   id: string;
@@ -11,7 +28,6 @@ interface Post {
   like_count: number;
   comment_count: number;
   created_at: string;
-  is_liked?: boolean;
   author: {
     id: string;
     username: string;
@@ -36,9 +52,21 @@ export default function FeedPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
-  const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ firstName: string; lastName: string } | null>(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setCurrentUser({ firstName: user.firstName || 'U', lastName: user.lastName || 'U' });
+    }
+    loadPosts();
+  }, []);
 
   const loadPosts = async () => {
     const token = localStorage.getItem('accessToken');
@@ -54,22 +82,18 @@ export default function FeedPage() {
       const data = await res.json();
       setPosts(data.posts || []);
 
-      // Check which posts are liked by current user
+      // Check liked posts
       const postIds = data.posts?.map((p: Post) => p.id) || [];
       const likedSet = new Set<string>();
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       for (const postId of postIds) {
         const likeRes = await fetch(`/api/posts/${postId}/likes`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const likeData = await likeRes.json();
-        
-        // Check if current user has liked this post
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
         const hasLiked = likeData.likes?.some((like: any) => like.user.id === user.id);
-        if (hasLiked) {
-          likedSet.add(postId);
-        }
+        if (hasLiked) likedSet.add(postId);
       }
       
       setLikedPosts(likedSet);
@@ -79,10 +103,6 @@ export default function FeedPage() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadPosts();
-  }, [router]);
 
   const handleLike = async (postId: string) => {
     const token = localStorage.getItem('accessToken');
@@ -97,7 +117,6 @@ export default function FeedPage() {
       });
 
       if (res.ok) {
-        // Update liked state
         const newLikedPosts = new Set(likedPosts);
         if (isLiked) {
           newLikedPosts.delete(postId);
@@ -106,221 +125,357 @@ export default function FeedPage() {
         }
         setLikedPosts(newLikedPosts);
 
-        // Update post like count
         setPosts(posts.map(p => 
           p.id === postId 
             ? { ...p, like_count: p.like_count + (isLiked ? -1 : 1) }
             : p
         ));
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to like post');
+
+        if (selectedPost?.id === postId) {
+          setSelectedPost({
+            ...selectedPost,
+            like_count: selectedPost.like_count + (isLiked ? -1 : 1)
+          });
+        }
       }
     } catch (err) {
       console.error('Like error:', err);
     }
   };
 
-  const loadComments = async (postId: string) => {
+  const openPostDialog = async (post: Post) => {
+    setSelectedPost(post);
+    setLoadingComments(true);
+    
     const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
     try {
-      const res = await fetch(`/api/posts/${postId}/comments`, {
+      const res = await fetch(`/api/posts/${post.id}/comments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      
-      if (res.ok) {
-        setComments((prev) => ({ ...prev, [postId]: data.comments || [] }));
-      }
+      setComments(data.comments || []);
     } catch (err) {
       console.error('Load comments error:', err);
     }
+    setLoadingComments(false);
   };
 
-  const toggleComments = (postId: string) => {
-    const isShowing = showComments[postId];
-    setShowComments((prev) => ({ ...prev, [postId]: !isShowing }));
-    
-    if (!isShowing && !comments[postId]) {
-      loadComments(postId);
-    }
-  };
+  const handleComment = async () => {
+    if (!selectedPost || !newComment.trim()) return;
 
-  const handleComment = async (postId: string, content: string) => {
     const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
-    if (!content.trim()) {
-      alert('Comment cannot be empty');
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/posts/${postId}/comments`, {
+      const res = await fetch(`/api/posts/${selectedPost.id}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content: content.trim() }),
+        body: JSON.stringify({ content: newComment.trim() }),
       });
 
       if (res.ok) {
-        loadPosts(); // Refresh posts to show updated count
-        loadComments(postId); // Reload comments to show new one
-      } else {
         const data = await res.json();
-        alert(data.error || 'Failed to add comment');
+        setComments([data.comment, ...comments]);
+        setNewComment('');
+        
+        setPosts(posts.map(p => 
+          p.id === selectedPost.id 
+            ? { ...p, comment_count: p.comment_count + 1 }
+            : p
+        ));
+        
+        setSelectedPost({
+          ...selectedPost,
+          comment_count: selectedPost.comment_count + 1
+        });
       }
     } catch (err) {
       console.error('Comment error:', err);
-      alert('Network error');
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading feed...</div>
+        <div className="text-muted-foreground">Loading feed...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold">My Feed</h1>
-            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">
-              ← Back
-            </a>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-4xl mx-auto py-6 px-4">
+    <AppLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {posts.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-600">No posts yet. Follow some users to see their posts!</p>
-            <a href="/users" className="mt-4 inline-block text-blue-600 hover:text-blue-800">
-              Discover Users →
-            </a>
-          </div>
+          <Card className="border-2 max-w-2xl mx-auto">
+            <CardContent className="p-12 text-center">
+              <p className="text-muted-foreground mb-4">No posts yet. Follow some users to see their posts!</p>
+              <Link href="/users">
+                <Button>Discover Users</Button>
+              </Link>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                    {post.author.first_name[0]}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {posts.map((post, index) => (
+              <motion.div
+                key={post.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+                className="h-full"
+              >
+                <Card 
+                  className="border-2 hover:shadow-2xl hover:border-primary/50 transition-all duration-300 cursor-pointer h-full flex flex-col overflow-hidden group"
+                  onClick={() => openPostDialog(post)}
+                >
+                  {/* Image Section - Fixed Height */}
+                  <div className="relative w-full h-56 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 overflow-hidden">
+                    {post.image_url ? (
+                      <Image
+                        src={post.image_url}
+                        alt="Post image"
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    <Badge className="absolute top-3 right-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-lg font-medium">
+                      {post.category.toUpperCase()}
+                    </Badge>
                   </div>
-                  <div className="ml-3">
-                    <p className="font-semibold">
-                      {post.author.first_name} {post.author.last_name}
-                    </p>
-                    <p className="text-sm text-gray-500">@{post.author.username}</p>
-                  </div>
-                  <span className="ml-auto text-xs text-gray-400">
-                    {new Date(post.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="text-gray-800 mb-2">{post.content}</p>
-                {post.image_url && (
-                  <img
-                    src={post.image_url}
-                    alt="Post"
-                    className="rounded-lg max-w-full h-auto"
-                  />
-                )}
-                <div className="mt-4 space-y-3">
-                  <div className="flex gap-4 text-sm items-center">
-                    <button 
-                      onClick={() => handleLike(post.id)}
-                      className={`px-3 py-1 rounded transition-colors ${
-                        likedPosts.has(post.id)
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                      }`}
-                    >
-                      👍 {post.like_count || 0}
-                    </button>
-                    <button 
-                      onClick={() => toggleComments(post.id)}
-                      className="px-3 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
-                    >
-                      💬 {post.comment_count || 0}
-                    </button>
-                    <span className="text-blue-600 font-medium">
-                      #{post.category.toLowerCase()}
-                    </span>
-                  </div>
-                  
-                  
-                  {/* Comments section */}
-                  {showComments[post.id] && (
-                    <div className="border-t pt-3 space-y-3">
-                      {/* Existing comments */}
-                      {comments[post.id] && comments[post.id].length > 0 ? (
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {comments[post.id].map((comment) => (
-                            <div key={comment.id} className="bg-gray-50 rounded p-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold text-sm">
-                                  {comment.user.first_name} {comment.user.last_name}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  @{comment.user.username}
-                                </span>
-                                <span className="text-xs text-gray-400 ml-auto">
-                                  {new Date(comment.created_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-700">{comment.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 text-center py-2">No comments yet</p>
-                      )}
-                      
-                      {/* Comment input */}
-                      <div className="flex gap-2">
-                        <input
-                          id={`comment-${post.id}`}
-                          type="text"
-                          placeholder="Add a comment..."
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              handleComment(post.id, e.currentTarget.value);
-                              e.currentTarget.value = '';
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={() => {
-                            const input = document.getElementById(`comment-${post.id}`) as HTMLInputElement;
-                            if (input && input.value.trim()) {
-                              handleComment(post.id, input.value);
-                              input.value = '';
-                            }
-                          }}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                        >
-                          Post
-                        </button>
+
+                  {/* Content Section */}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10 border-2 border-background shadow-md">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold text-sm">
+                          {post.author.first_name[0]}{post.author.last_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">
+                          {post.author.first_name} {post.author.last_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          @{post.author.username}
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
+                  </CardHeader>
+
+                  <CardContent className="flex-1 flex flex-col pt-0">
+                    {/* Post Content - Fixed Height with Ellipsis */}
+                    <p className="text-sm leading-relaxed mb-4 line-clamp-3 flex-1">
+                      {post.content}
+                    </p>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-4 pt-3 border-t">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLike(post.id);
+                        }}
+                        className={`flex items-center gap-1.5 transition-colors ${
+                          likedPosts.has(post.id)
+                            ? 'text-pink-600 dark:text-pink-400'
+                            : 'text-muted-foreground hover:text-pink-600'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${likedPosts.has(post.id) ? 'fill-current' : ''}`} />
+                        <span className="text-sm font-medium">{post.like_count}</span>
+                      </motion.button>
+
+                      <button className="flex items-center gap-1.5 text-muted-foreground hover:text-blue-600 transition-colors">
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="text-sm font-medium">{post.comment_count}</span>
+                      </button>
+
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {new Date(post.created_at).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+
+      {/* Post Detail Dialog */}
+      <Dialog open={!!selectedPost} onOpenChange={() => setSelectedPost(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          {selectedPost && (
+            <>
+              <DialogHeader className="px-6 pt-6 pb-4 border-b">
+                <DialogTitle className="flex items-center gap-3">
+                  <Avatar className="w-12 h-12 border-2 border-primary/20">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold">
+                      {selectedPost.author.first_name[0]}{selectedPost.author.last_name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-semibold text-lg">
+                      {selectedPost.author.first_name} {selectedPost.author.last_name}
+                    </p>
+                    <p className="text-sm text-muted-foreground font-normal">
+                      @{selectedPost.author.username} · {new Date(selectedPost.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-md">
+                    {selectedPost.category.toUpperCase()}
+                  </Badge>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto">
+                <div className="px-6 py-4 space-y-4">
+                  {/* Post Content */}
+                  <p className="text-base leading-relaxed">{selectedPost.content}</p>
+
+                  {/* Image */}
+                  {selectedPost.image_url && (
+                    <div className="relative w-full h-[400px] rounded-xl overflow-hidden bg-muted border-2">
+                      <Image
+                        src={selectedPost.image_url}
+                        alt="Post image"
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 768px) 100vw, 800px"
+                        priority
+                      />
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-8 py-3 border-y">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => handleLike(selectedPost.id)}
+                      className={`flex items-center gap-2 transition-colors ${
+                        likedPosts.has(selectedPost.id)
+                          ? 'text-pink-600 dark:text-pink-400'
+                          : 'text-muted-foreground hover:text-pink-600'
+                      }`}
+                    >
+                      <Heart className={`w-6 h-6 ${likedPosts.has(selectedPost.id) ? 'fill-current' : ''}`} />
+                      <span className="font-semibold">{selectedPost.like_count}</span>
+                    </motion.button>
+
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MessageCircle className="w-6 h-6" />
+                      <span className="font-semibold">{selectedPost.comment_count}</span>
+                    </div>
+                  </div>
+
+                  {/* Comments Section */}
+                  <div className="space-y-4 pb-4">
+                    <h3 className="font-semibold text-lg">Comments</h3>
+
+                    {/* Add Comment */}
+                    <div className="flex gap-3">
+                      {currentUser && (
+                        <Avatar className="w-10 h-10 mt-1">
+                          <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white text-sm">
+                            {currentUser.firstName[0]}{currentUser.lastName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className="flex-1 flex gap-2">
+                        <Textarea
+                          placeholder="Write a comment..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="resize-none min-h-[80px]"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleComment();
+                            }
+                          }}
+                        />
+                        <Button 
+                          onClick={handleComment} 
+                          disabled={!newComment.trim()}
+                          size="icon"
+                          className="h-10 w-10"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Comments List */}
+                    {loadingComments ? (
+                      <div className="text-center py-8">
+                        <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : comments.length === 0 ? (
+                      <div className="text-center py-12 bg-muted/30 rounded-lg border-2 border-dashed">
+                        <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-sm text-muted-foreground">No comments yet. Be the first to comment!</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {comments.map((comment) => (
+                          <motion.div 
+                            key={comment.id} 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex gap-3 p-4 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors"
+                          >
+                            <Avatar className="w-10 h-10 border-2 border-background">
+                              <AvatarFallback className="text-xs bg-gradient-to-br from-blue-600 to-purple-600 text-white font-semibold">
+                                {comment.user.first_name[0]}{comment.user.last_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <p className="font-semibold text-sm">
+                                  {comment.user.first_name} {comment.user.last_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  @{comment.user.username}
+                                </p>
+                                <span className="text-xs text-muted-foreground">·</span>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(comment.created_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                              <p className="text-sm leading-relaxed break-words">{comment.content}</p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </AppLayout>
   );
 }

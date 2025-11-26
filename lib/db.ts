@@ -458,14 +458,33 @@ export const db = {
     async listUsers(page: number = 1, limit: number = 20) {
       const offset = (page - 1) * limit;
 
-      const { data, error, count } = await supabaseAdmin
+      // First get users
+      const { data: usersData, error: usersError, count } = await supabaseAdmin
         .from('users')
         .select('id, email, username, first_name, last_name, role, is_active, created_at', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
-      if (error) throw error;
-      return { users: data, total: count || 0 };
+      if (usersError) throw usersError;
+
+      // Then get profiles for these users
+      const userIds = usersData?.map(u => u.id) || [];
+      const { data: profilesData, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id, bio, avatar_url, website, location, visibility')
+        .in('user_id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Map profiles to users
+      const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || []);
+      
+      const users = usersData?.map(user => ({
+        ...user,
+        profile: profilesMap.get(user.id) || null
+      })) || [];
+      
+      return { users, total: count || 0 };
     },
 
     async getUserDetails(userId: string) {
