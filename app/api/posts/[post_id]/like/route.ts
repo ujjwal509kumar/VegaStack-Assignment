@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticate, AuthenticatedRequest } from '@/lib/middleware';
 
-// Like post
+// Toggle like/unlike post
 async function likeHandler(
   req: AuthenticatedRequest,
   { params }: { params: Promise<{ post_id: string }> }
@@ -20,23 +20,33 @@ async function likeHandler(
 
     // Check if already liked
     const isLiked = await db.likes.isLiked(userId, postId);
+    
     if (isLiked) {
-      return NextResponse.json({ error: 'Already liked this post' }, { status: 409 });
-    }
+      // Unlike the post
+      await db.likes.unlike(userId, postId);
+      return NextResponse.json({ 
+        message: 'Post unliked successfully',
+        action: 'unliked'
+      });
+    } else {
+      // Like the post
+      await db.likes.like(userId, postId);
 
-    await db.likes.like(userId, postId);
+      // Create notification for post author
+      if (post.author_id !== userId) {
+        await db.notifications.create({
+          userId: post.author_id,
+          type: 'LIKE',
+          message: `Someone liked your post`,
+          relatedId: postId,
+        });
+      }
 
-    // Create notification for post author
-    if (post.author_id !== userId) {
-      await db.notifications.create({
-        userId: post.author_id,
-        type: 'LIKE',
-        message: `Someone liked your post`,
-        relatedId: postId,
+      return NextResponse.json({ 
+        message: 'Post liked successfully',
+        action: 'liked'
       });
     }
-
-    return NextResponse.json({ message: 'Post liked successfully' });
   } catch (error) {
     console.error('Like error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

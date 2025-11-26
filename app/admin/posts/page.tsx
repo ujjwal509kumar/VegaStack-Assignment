@@ -178,7 +178,7 @@ export default function AdminPostsPage() {
                     onClick={() => toggleLikes(post.id)}
                     className="hover:text-blue-600 cursor-pointer"
                   >
-                    ❤️ {post.like_count}
+                    👍 {post.like_count}
                   </button>
                   <button
                     onClick={() => toggleComments(post.id)}

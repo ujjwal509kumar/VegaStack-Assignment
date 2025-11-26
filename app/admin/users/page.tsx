@@ -49,9 +49,30 @@ export default function AdminUsersPage() {
 
       if (res.ok) {
         alert('User deactivated successfully');
-        window.location.reload();
+        setUsers(users.map(u => u.id === userId ? { ...u, is_active: false } : u));
       } else {
         alert('Failed to deactivate user');
+      }
+    } catch (err) {
+      alert('Network error');
+    }
+  };
+
+  const handleActivate = async (userId: string) => {
+    if (!confirm('Are you sure you want to activate this user?')) return;
+
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/activate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        alert('User activated successfully');
+        setUsers(users.map(u => u.id === userId ? { ...u, is_active: true } : u));
+      } else {
+        alert('Failed to activate user');
       }
     } catch (err) {
       alert('Network error');
@@ -114,12 +135,19 @@ export default function AdminUsersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {user.is_active && (
+                    {user.is_active ? (
                       <button
                         onClick={() => handleDeactivate(user.id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         Deactivate
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleActivate(user.id)}
+                        className="text-green-600 hover:text-green-900"
+                      >
+                        Activate
                       </button>
                     )}
                   </td>

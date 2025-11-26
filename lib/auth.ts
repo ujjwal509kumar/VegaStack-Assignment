@@ -30,8 +30,14 @@ export const generateRefreshToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY } as jwt.SignOptions);
 };
 
-export const verifyToken = (token: string): TokenPayload => {
-  return jwt.verify(token, JWT_SECRET) as TokenPayload;
+export const verifyToken = (token: string): TokenPayload | null => {
+  try {
+    return jwt.verify(token, JWT_SECRET) as TokenPayload;
+  } catch (error) {
+    // Token is invalid, expired, or tampered with
+    console.error('Token verification failed:', error);
+    return null;
+  }
 };
 
 export const getTokenExpiry = (expiryString: string): Date => {

@@ -9,29 +9,30 @@ export const authenticate = (
   handler: (req: AuthenticatedRequest) => Promise<NextResponse>
 ) => {
   return async (req: NextRequest) => {
-    try {
-      const authHeader = req.headers.get('authorization');
-      
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return NextResponse.json(
-          { error: 'Unauthorized - No token provided' },
-          { status: 401 }
-        );
-      }
-
-      const token = authHeader.substring(7);
-      const payload = verifyToken(token);
-      
-      const authenticatedReq = req as AuthenticatedRequest;
-      authenticatedReq.user = payload;
-      
-      return handler(authenticatedReq);
-    } catch (error) {
+    const authHeader = req.headers.get('authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
-        { error: 'Unauthorized - Invalid token' },
+        { error: 'Unauthorized - No token provided', shouldLogout: true },
         { status: 401 }
       );
     }
+
+    const token = authHeader.substring(7);
+    const payload = verifyToken(token);
+    
+    // If token verification fails (tampered, expired, or invalid)
+    if (!payload) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Invalid or tampered token', shouldLogout: true },
+        { status: 401 }
+      );
+    }
+    
+    const authenticatedReq = req as AuthenticatedRequest;
+    authenticatedReq.user = payload;
+    
+    return handler(authenticatedReq);
   };
 };
 

@@ -10,6 +10,13 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
+  profile?: {
+    avatar_url?: string;
+    bio?: string;
+    website?: string;
+    location?: string;
+    visibility?: string;
+  };
   stats: {
     followersCount: number;
     followingCount: number;
@@ -37,9 +44,20 @@ export default function DashboardPage() {
     fetch('/api/users/me/stats', {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (res.status === 401) {
+          const data = await res.json().catch(() => ({}));
+          if (data.shouldLogout || data.error?.includes('Invalid') || data.error?.includes('tampered')) {
+            console.error('Token is invalid or tampered - logging out');
+            localStorage.clear();
+            router.push('/login');
+            return;
+          }
+        }
+        return res.json();
+      })
       .then((data) => {
-        if (data.stats) {
+        if (data && data.stats) {
           setUser((prev) => prev ? { ...prev, stats: data.stats } : null);
           // Update localStorage with fresh stats
           const updatedUser = { ...parsedUser, stats: data.stats };
@@ -111,9 +129,23 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Welcome, {user.firstName} {user.lastName}!
-            </h2>
+            <div className="flex items-start gap-4 mb-4">
+              {user.profile?.avatar_url && (
+                <img 
+                  src={user.profile.avatar_url} 
+                  alt={`${user.firstName} ${user.lastName}`}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                />
+              )}
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Welcome, {user.firstName} {user.lastName}!
+                </h2>
+                {user.profile?.bio && (
+                  <p className="text-gray-600 mt-2">{user.profile.bio}</p>
+                )}
+              </div>
+            </div>
             
             <div className="space-y-4">
               <div>

@@ -11,6 +11,7 @@ interface Post {
   like_count: number;
   comment_count: number;
   created_at: string;
+  is_liked?: boolean;
   author: {
     id: string;
     username: string;
@@ -37,23 +38,46 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
   const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
 
-  const loadPosts = () => {
+  const loadPosts = async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
       router.push('/login');
       return;
     }
 
-    fetch('/api/feed', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setPosts(data.posts || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    try {
+      const res = await fetch('/api/feed', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setPosts(data.posts || []);
+
+      // Check which posts are liked by current user
+      const postIds = data.posts?.map((p: Post) => p.id) || [];
+      const likedSet = new Set<string>();
+      
+      for (const postId of postIds) {
+        const likeRes = await fetch(`/api/posts/${postId}/likes`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const likeData = await likeRes.json();
+        
+        // Check if current user has liked this post
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const hasLiked = likeData.likes?.some((like: any) => like.user.id === user.id);
+        if (hasLiked) {
+          likedSet.add(postId);
+        }
+      }
+      
+      setLikedPosts(likedSet);
+      setLoading(false);
+    } catch (err) {
+      console.error('Load posts error:', err);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -64,6 +88,8 @@ export default function FeedPage() {
     const token = localStorage.getItem('accessToken');
     if (!token) return;
 
+    const isLiked = likedPosts.has(postId);
+
     try {
       const res = await fetch(`/api/posts/${postId}/like`, {
         method: 'POST',
@@ -71,7 +97,21 @@ export default function FeedPage() {
       });
 
       if (res.ok) {
-        loadPosts(); // Refresh posts to show updated count
+        // Update liked state
+        const newLikedPosts = new Set(likedPosts);
+        if (isLiked) {
+          newLikedPosts.delete(postId);
+        } else {
+          newLikedPosts.add(postId);
+        }
+        setLikedPosts(newLikedPosts);
+
+        // Update post like count
+        setPosts(posts.map(p => 
+          p.id === postId 
+            ? { ...p, like_count: p.like_count + (isLiked ? -1 : 1) }
+            : p
+        ));
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to like post');
@@ -196,20 +236,26 @@ export default function FeedPage() {
                   />
                 )}
                 <div className="mt-4 space-y-3">
-                  <div className="flex gap-4 text-sm">
+                  <div className="flex gap-4 text-sm items-center">
                     <button 
                       onClick={() => handleLike(post.id)}
-                      className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100"
+                      className={`px-3 py-1 rounded transition-colors ${
+                        likedPosts.has(post.id)
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      }`}
                     >
-                      ❤️ {post.like_count || 0}
+                      👍 {post.like_count || 0}
                     </button>
                     <button 
                       onClick={() => toggleComments(post.id)}
-                      className="px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                      className="px-3 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
                     >
                       💬 {post.comment_count || 0}
                     </button>
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">{post.category}</span>
+                    <span className="text-blue-600 font-medium">
+                      #{post.category.toLowerCase()}
+                    </span>
                   </div>
                   
                   

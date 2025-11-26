@@ -133,13 +133,13 @@ export default function UsersPage() {
                 </div>
                 <button
                   onClick={() => handleFollow(user.id)}
-                  className={`px-4 py-2 rounded-md ${
+                  className={`px-4 py-2 rounded-md transition-colors ${
                     followingIds.has(user.id)
-                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  {followingIds.has(user.id) ? 'Following' : 'Follow'}
+                  {followingIds.has(user.id) ? 'Unfollow' : 'Follow'}
                 </button>
               </div>
             ))}

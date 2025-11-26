@@ -12,6 +12,7 @@ export default function ProfilePage() {
     visibility: 'PUBLIC',
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
   const [currentAvatar, setCurrentAvatar] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -94,6 +95,23 @@ export default function ProfilePage() {
         return;
       }
 
+      // Update current avatar display
+      setCurrentAvatar(avatarUrl);
+      setAvatarFile(null);
+      setAvatarPreview('');
+
+      // Update localStorage with new profile data
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        userData.profile = {
+          ...userData.profile,
+          ...formData,
+          avatar_url: avatarUrl,
+        };
+        localStorage.setItem('user', JSON.stringify(userData));
+      }
+
       setSuccess('Profile updated successfully!');
       setLoading(false);
     } catch (err) {
@@ -148,16 +166,30 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Avatar
             </label>
-            {currentAvatar && (
-              <div className="mb-2">
-                <img src={currentAvatar} alt="Current avatar" className="w-20 h-20 rounded-full object-cover" />
-              </div>
-            )}
+            <div className="mb-2">
+              <img 
+                src={avatarPreview || currentAvatar || 'https://via.placeholder.com/80'} 
+                alt="Avatar preview" 
+                className="w-20 h-20 rounded-full object-cover border-2 border-gray-300" 
+              />
+            </div>
             <input
               type="file"
               accept="image/jpeg,image/png"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setAvatarFile(file);
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setAvatarPreview(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                } else {
+                  setAvatarPreview('');
+                }
+              }}
             />
             <p className="mt-1 text-sm text-gray-500">
               JPEG or PNG, max 2MB
