@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { validateEmail, validateUsername, validatePassword } from '@/lib/validators';
 import { supabaseAdmin } from '@/lib/supabase';
+import { sendEmail, getVerificationEmailTemplate } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,26 +73,38 @@ export async function POST(req: NextRequest) {
     // Create profile
     await supabaseAdmin.from('profiles').insert({ user_id: user.id });
 
-    // Create user in Supabase Auth to trigger email
+    // Generate email verification link and send email
     try {
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'signup',
         email: email,
-        email_confirm: false,
-        user_metadata: {
-          user_id: user.id,
-          username: username,
-          first_name: firstName,
-          last_name: lastName,
+        password: password,
+        options: {
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL}/auth/callback`,
+          data: {
+            user_id: user.id,
+            username: username,
+            first_name: firstName,
+            last_name: lastName,
+          },
         },
       });
 
-      if (authError) {
-        console.error('Supabase Auth user creation error:', authError);
-      } else {
-        console.log('Verification email sent to:', email);
+      if (linkError) {
+        console.error('Failed to generate verification link:', linkError);
+      } else if (linkData?.properties?.action_link) {
+        const verificationLink = linkData.properties.action_link;
+        
+        // Send verification email
+        const emailTemplate = getVerificationEmailTemplate(firstName, verificationLink);
+        await sendEmail({
+          to: email,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+        });
       }
     } catch (emailError) {
-      console.error('Failed to create auth user:', emailError);
+      console.error('Email generation error:', emailError);
     }
     
     return NextResponse.json(

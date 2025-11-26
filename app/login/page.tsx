@@ -21,15 +21,33 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Redirect if already logged in
+  // Redirect if already logged in and show messages from URL
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (token) {
       router.push('/dashboard');
+      return;
+    }
+
+    // Check for URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const message = params.get('message');
+    const verified = params.get('verified');
+
+    if (error === 'verification_failed') {
+      toast.error(message || 'Email link is invalid or has expired. Please request a new one.', {
+        duration: 6000,
+      });
+    } else if (verified === 'true') {
+      toast.success(message || 'Email verified successfully! You can now log in.', {
+        duration: 5000,
+        icon: '✅',
+      });
     }
   }, [router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -44,7 +62,11 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Login failed');
+        const errorMessage = data.error || 'Wrong email or password';
+        setError(errorMessage);
+        toast.error(errorMessage, {
+          duration: 4000,
+        });
         setLoading(false);
         return;
       }
@@ -58,7 +80,9 @@ export default function LoginPage() {
       });
       setTimeout(() => router.push('/dashboard'), 1000);
     } catch (err) {
-      toast.error('Network error. Please try again.');
+      const errorMessage = 'Network error. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
       setLoading(false);
     }
   };
@@ -136,6 +160,12 @@ export default function LoginPage() {
                     />
                   </div>
                 </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  </div>
+                )}
 
                 <Button
                   type="submit"

@@ -63,15 +63,16 @@ export default function NotificationProvider({ children }: { children: React.Rea
         position="top-center"
         toastOptions={{
           duration: 4000,
+          className: '',
           style: {
-            background: 'hsl(var(--background))',
-            color: 'hsl(var(--foreground))',
-            border: '2px solid hsl(var(--border))',
+            background: '#ffffff',
+            color: '#0f172a',
+            border: '2px solid #e2e8f0',
             padding: '16px 20px',
             borderRadius: '12px',
             fontSize: '15px',
             fontWeight: '500',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08)',
             maxWidth: '500px',
             minWidth: '300px',
           },
@@ -81,9 +82,10 @@ export default function NotificationProvider({ children }: { children: React.Rea
               secondary: '#ffffff',
             },
             style: {
-              background: 'hsl(var(--background))',
+              background: '#ffffff',
+              color: '#0f172a',
               border: '2px solid #10b981',
-              boxShadow: '0 20px 25px -5px rgba(16, 185, 129, 0.2), 0 10px 10px -5px rgba(16, 185, 129, 0.1)',
+              boxShadow: '0 20px 25px -5px rgba(16, 185, 129, 0.25), 0 10px 10px -5px rgba(16, 185, 129, 0.15)',
             },
           },
           error: {
@@ -92,9 +94,10 @@ export default function NotificationProvider({ children }: { children: React.Rea
               secondary: '#ffffff',
             },
             style: {
-              background: 'hsl(var(--background))',
+              background: '#ffffff',
+              color: '#0f172a',
               border: '2px solid #ef4444',
-              boxShadow: '0 20px 25px -5px rgba(239, 68, 68, 0.2), 0 10px 10px -5px rgba(239, 68, 68, 0.1)',
+              boxShadow: '0 20px 25px -5px rgba(239, 68, 68, 0.25), 0 10px 10px -5px rgba(239, 68, 68, 0.15)',
             },
           },
           loading: {
@@ -103,9 +106,10 @@ export default function NotificationProvider({ children }: { children: React.Rea
               secondary: '#ffffff',
             },
             style: {
-              background: 'hsl(var(--background))',
+              background: '#ffffff',
+              color: '#0f172a',
               border: '2px solid #3b82f6',
-              boxShadow: '0 20px 25px -5px rgba(59, 130, 246, 0.2), 0 10px 10px -5px rgba(59, 130, 246, 0.1)',
+              boxShadow: '0 20px 25px -5px rgba(59, 130, 246, 0.25), 0 10px 10px -5px rgba(59, 130, 246, 0.15)',
             },
           },
         }}

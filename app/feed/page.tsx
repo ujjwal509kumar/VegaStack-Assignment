@@ -16,8 +16,17 @@ import {
   Heart, 
   MessageCircle,
   Send,
-  ImageIcon
+  ImageIcon,
+  Trash2,
+  MoreVertical
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import toast from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 
 interface Post {
@@ -57,13 +66,13 @@ export default function FeedPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ firstName: string; lastName: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; firstName: string; lastName: string } | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       const user = JSON.parse(userData);
-      setCurrentUser({ firstName: user.firstName || 'U', lastName: user.lastName || 'U' });
+      setCurrentUser({ id: user.id, firstName: user.firstName || 'U', lastName: user.lastName || 'U' });
     }
     loadPosts();
   }, []);
@@ -195,6 +204,29 @@ export default function FeedPage() {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        toast.success('Post deleted successfully');
+        setPosts(posts.filter(p => p.id !== postId));
+        setSelectedPost(null);
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete post');
+      }
+    } catch (err) {
+      toast.error('Failed to delete post');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -247,6 +279,31 @@ export default function FeedPage() {
                     <Badge className="absolute top-3 right-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-lg font-medium">
                       {post.category.toUpperCase()}
                     </Badge>
+                    {currentUser?.id === post.author.id && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-3 left-3 h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePost(post.id);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Post
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
 
                   {/* Content Section */}
@@ -340,6 +397,24 @@ export default function FeedPage() {
                   <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-md">
                     {selectedPost.category.toUpperCase()}
                   </Badge>
+                  {currentUser?.id === selectedPost.author.id && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-9 w-9">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600 cursor-pointer"
+                          onClick={() => handleDeletePost(selectedPost.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Post
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </DialogTitle>
               </DialogHeader>
 

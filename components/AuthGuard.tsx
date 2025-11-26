@@ -10,7 +10,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Skip auth check for public pages
     const publicPages = ['/', '/login', '/register', '/forgot-password'];
-    if (publicPages.includes(pathname)) {
+    const publicPaths = ['/auth/reset-password', '/auth/callback', '/verify'];
+    
+    if (publicPages.includes(pathname) || publicPaths.some(path => pathname.startsWith(path))) {
       return;
     }
 

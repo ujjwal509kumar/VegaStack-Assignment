@@ -16,7 +16,8 @@ import {
   Sparkles,
   Menu,
   X,
-  LayoutDashboard
+  LayoutDashboard,
+  KeyRound
 } from 'lucide-react';
 
 interface User {
@@ -72,6 +73,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: 'Create Post', href: '/posts/create', icon: PenSquare },
     { name: 'My Profile', href: '/profile', icon: UserCircle },
     { name: 'Discover', href: '/users', icon: Users },
+    { name: 'Change Password', href: '/change-password', icon: KeyRound },
   ];
 
   const adminItems = [

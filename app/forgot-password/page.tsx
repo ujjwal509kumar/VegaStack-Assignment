@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -16,6 +16,19 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Check for error messages from URL
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const message = params.get('message');
+
+    if (errorParam && message) {
+      toast.error(decodeURIComponent(message), {
+        duration: 6000,
+      });
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
