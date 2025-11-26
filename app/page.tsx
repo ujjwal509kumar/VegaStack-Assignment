@@ -1,13 +1,93 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, MessageCircle, Heart, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+
+// Animated heading component
+function AnimatedHeading() {
+  const words = ["Connect", "Share", "Discover"];
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [displayedLetters, setDisplayedLetters] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+  
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    if (isAnimating) {
+      // Show letters one by one
+      if (displayedLetters < words[currentWordIndex].length) {
+        timeout = setTimeout(() => {
+          setDisplayedLetters(prev => prev + 1);
+        }, 80); // Smooth letter reveal
+      } else {
+        // Word complete, wait then start disappearing
+        timeout = setTimeout(() => {
+          setIsAnimating(false);
+          setDisplayedLetters(words[currentWordIndex].length);
+        }, 1500); // Perfect timing for reading
+      }
+    } else {
+      // Disappearing animation
+      if (displayedLetters > 0) {
+        timeout = setTimeout(() => {
+          setDisplayedLetters(prev => prev - 1);
+        }, 50); // Quick disappear
+      } else {
+        // Move to next word
+        timeout = setTimeout(() => {
+          setCurrentWordIndex(prev => (prev + 1) % words.length);
+          setIsAnimating(true);
+        }, 300); // Smooth transition delay
+      }
+    }
+    
+    return () => clearTimeout(timeout);
+  }, [displayedLetters, isAnimating, currentWordIndex, words]);
+  
+  const currentWord = words[currentWordIndex];
+  const visibleText = currentWord.slice(0, displayedLetters);
+  
+  return (
+    <div className="relative">
+      <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-tight">
+        <motion.span
+          className={`inline-block ${currentWordIndex === 2 ? "bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent" : ""}`}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          {visibleText}
+          {displayedLetters < currentWord.length && (
+            <motion.span
+              className="inline-block w-1 h-12 sm:h-14 lg:h-16 bg-current ml-1 animate-pulse"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0] }}
+              transition={{ duration: 0.8, repeat: Infinity }}
+            />
+          )}
+        </motion.span>
+      </h1>
+      
+      {/* Subtle background glow effect */}
+      <motion.div
+        key={`glow-${currentWordIndex}`}
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: 0.2, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.5 }}
+        transition={{ duration: 0.5 }}
+        className={`absolute -inset-4 ${currentWordIndex === 2 ? "bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10" : "bg-gradient-to-r from-blue-500/5 to-purple-500/5"} rounded-full blur-3xl -z-10`}
+      />
+    </div>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
@@ -85,19 +165,19 @@ export default function Home() {
               transition={{ duration: 0.5 }}
               className="text-center lg:text-left space-y-8"
             >
-              <div className="space-y-6">
-                <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-tight">
-                  Connect, Share,
-                  <br />
-                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    Discover
-                  </span>
-                </h1>
+              <div className="space-y-8">
+                <div className="relative min-h-[100px] sm:min-h-[120px] lg:min-h-[140px]">
+                  <AnimatedHeading />
+                </div>
                 
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                  A modern social platform where you can share posts, connect with others, 
-                  and discover amazing content.
-                </p>
+                <motion.p 
+              className="text-xl text-muted-foreground max-w-2xl mx-auto"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+            >
+              Use Social Connect to <span className="font-semibold text-foreground">create</span> meaningful relationships, <span className="font-semibold text-foreground">share</span> your ideas with the world, and <span className="font-semibold text-foreground bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">discover</span> inspiring content from a global community of creators and innovators.
+            </motion.p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -129,7 +209,7 @@ export default function Home() {
                 <CardContent className="p-8 relative">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-lg">
-                      SC
+                      UK
                     </div>
                     <div>
                       <p className="font-semibold text-lg">Ujjwal Kumar</p>
