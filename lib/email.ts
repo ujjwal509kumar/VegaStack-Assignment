@@ -122,12 +122,8 @@ export function getVerificationEmailTemplate(name: string, verificationLink: str
 }
 
 export function getPasswordResetEmailTemplate(name: string, resetLink: string) {
-  // Extract token from Supabase link and create our own link
-  const urlParams = new URL(resetLink);
-  const token = urlParams.searchParams.get('token_hash') || urlParams.searchParams.get('token');
-  const type = 'recovery';
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
-  const customLink = `${baseUrl}/verify?token=${token}&type=${type}`;
+  // resetLink is already the full custom link from password-reset API
+  const customLink = resetLink;
   
   return {
     subject: 'Reset Your Password - SocialConnect',

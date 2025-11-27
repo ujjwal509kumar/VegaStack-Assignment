@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth';
 import { validatePassword } from '@/lib/validators';
 import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,25 +16,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Decode custom token (format: base64(userId:timestamp))
+    let userId: string;
+    let timestamp: string;
+    
+    try {
+      const decoded = Buffer.from(token, 'base64').toString('utf-8');
+      [userId, timestamp] = decoded.split(':');
+
+      if (!userId || !timestamp) {
+        return NextResponse.json(
+          { error: 'Invalid reset token' },
+          { status: 400 }
+        );
+      }
+    } catch (decodeError) {
+      return NextResponse.json(
+        { error: 'Invalid reset token' },
+        { status: 400 }
+      );
+    }
+
+    // Check if token is expired (1 hour)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    const maxAge = 60 * 60 * 1000; // 1 hour
+
+    if (tokenAge > maxAge) {
+      return NextResponse.json(
+        { error: 'This reset link has expired. Please request a new one.' },
+        { status: 400 }
+      );
+    }
+
     // Check if token has already been used
-    console.log('Checking if token is already used:', token);
-    const { data: usedToken, error: checkError } = await supabaseAdmin
+    const { data: usedToken } = await supabaseAdmin
       .from('used_tokens')
       .select('*')
       .eq('token_hash', token)
       .single();
 
-    console.log('Used token check result:', { usedToken, checkError });
-
     if (usedToken) {
-      console.log('Token already used! Rejecting...');
       return NextResponse.json(
         { error: 'This reset link has already been used. Please request a new one.' },
         { status: 400 }
       );
     }
-
-    console.log('Token is new, proceeding...');
 
     // Validate new password
     const passwordValidation = validatePassword(newPassword);
@@ -44,61 +71,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify the reset token with Supabase Auth
-    const { data, error: verifyError } = await supabaseAdmin.auth.verifyOtp({
-      token_hash: token,
-      type: 'recovery',
-    });
-
-    if (verifyError || !data.user) {
-      const errorMessage = verifyError?.message || 'Invalid or expired reset token';
+    // Get user
+    const user = await db.users.findById(userId);
+    if (!user) {
       return NextResponse.json(
-        { error: errorMessage.includes('expired') ? 'This reset link has expired. Please request a new one.' : errorMessage },
-        { status: 400 }
+        { error: 'User not found' },
+        { status: 404 }
       );
     }
 
-    // Mark token as used BEFORE updating password
-    console.log('Marking token as used:', token, data.user.email);
-    const { error: insertError } = await supabaseAdmin
+    // Mark token as used
+    await supabaseAdmin
       .from('used_tokens')
       .insert({
         token_hash: token,
-        user_email: data.user.email,
+        user_email: user.email,
       });
-
-    if (insertError) {
-      console.error('Failed to mark token as used:', insertError);
-    } else {
-      console.log('Token marked as used successfully');
-    }
 
     // Hash new password
     const hashedPassword = await hashPassword(newPassword);
 
-    // Update password in our database
+    // Update password in database
     const { error } = await supabaseAdmin
       .from('users')
       .update({ 
         password: hashedPassword,
         updated_at: new Date().toISOString()
       })
-      .eq('email', data.user.email);
+      .eq('id', userId);
 
     if (error) throw error;
-
-    // Invalidate all existing sessions for this user in Supabase Auth
-    try {
-      await supabaseAdmin.auth.admin.signOut(data.user.id);
-    } catch (signOutError) {
-      console.error('Failed to sign out user sessions:', signOutError);
-    }
 
     return NextResponse.json({
       message: 'Password reset successfully. You can now login with your new password.',
     });
   } catch (error) {
-    console.error('Password reset confirm error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

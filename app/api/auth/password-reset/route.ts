@@ -13,34 +13,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user exists
-    const user = await db.users.findByEmailOrUsername(email);
+    const user = await db.users.findByEmail(email);
     
     if (user) {
-      // Generate password reset link and send email
+      // Generate custom reset token
+      const resetToken = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+      const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?token=${resetToken}`;
+      
+      // Send password reset email
       try {
-        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'recovery',
-          email: email,
-          options: {
-            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL}/auth/reset-password`,
-          },
+        const emailTemplate = getPasswordResetEmailTemplate(user.first_name, resetLink);
+        await sendEmail({
+          to: email,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
         });
-
-        if (linkError) {
-          console.error('Password reset link generation error:', linkError);
-        } else if (linkData?.properties?.action_link) {
-          const resetLink = linkData.properties.action_link;
-          
-          // Send password reset email
-          const emailTemplate = getPasswordResetEmailTemplate(user.first_name, resetLink);
-          await sendEmail({
-            to: email,
-            subject: emailTemplate.subject,
-            html: emailTemplate.html,
-          });
-        }
       } catch (emailError) {
-        console.error('Failed to generate password reset link:', emailError);
+        console.error('Failed to send password reset email:', emailError);
       }
     }
 

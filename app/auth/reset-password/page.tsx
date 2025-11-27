@@ -24,36 +24,65 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     const token = searchParams.get('token');
-    console.log('Reset password page loaded with token:', token);
     
     if (!token) {
       toast.error('Invalid reset link. Please request a new one.');
       setTimeout(() => router.push('/forgot-password'), 2000);
+      setTokenValid(false);
       return;
     }
 
-    // Check if token has already been used
-    fetch('/api/auth/check-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.valid) {
-          setTokenValid(true);
-        } else {
-          setTokenValid(false);
-          toast.error(data.error || 'This reset link has expired or has already been used.');
-          setTimeout(() => router.push('/forgot-password'), 3000);
-        }
-      })
-      .catch(() => {
-        setTokenValid(false);
-        toast.error('Failed to validate reset link.');
-        setTimeout(() => router.push('/forgot-password'), 3000);
-      });
+    // Validate token before showing form
+    validateToken(token);
   }, [searchParams, router]);
+
+  const validateToken = async (token: string) => {
+    try {
+      // Decode token to check expiry and if it's been used
+      const decoded = Buffer.from(token, 'base64').toString('utf-8');
+      const [userId, timestamp] = decoded.split(':');
+
+      if (!userId || !timestamp) {
+        toast.error('Invalid reset link.');
+        setTokenValid(false);
+        setTimeout(() => router.push('/forgot-password'), 2000);
+        return;
+      }
+
+      // Check if expired (1 hour)
+      const tokenAge = Date.now() - parseInt(timestamp);
+      const maxAge = 60 * 60 * 1000;
+
+      if (tokenAge > maxAge) {
+        toast.error('This reset link has expired. Please request a new one.');
+        setTokenValid(false);
+        setTimeout(() => router.push('/forgot-password'), 2000);
+        return;
+      }
+
+      // Check if token has been used
+      const res = await fetch('/api/auth/check-reset-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.used) {
+        toast.error('This reset link has already been used. Please request a new one.');
+        setTokenValid(false);
+        setTimeout(() => router.push('/forgot-password'), 2000);
+        return;
+      }
+
+      setTokenValid(true);
+    } catch (error) {
+      toast.error('Invalid reset link.');
+      setTokenValid(false);
+      setTimeout(() => router.push('/forgot-password'), 2000);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
