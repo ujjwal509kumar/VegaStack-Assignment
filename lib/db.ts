@@ -36,6 +36,28 @@ export const db = {
       return data;
     },
 
+    async findByEmail(email: string) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+
+    async findByUsername(username: string) {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+
     async findById(id: string) {
       const { data, error } = await supabaseAdmin
         .from('users')
