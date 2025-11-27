@@ -40,20 +40,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if user already exists
-    const existingUser = await db.users.findByEmailOrUsername(email);
-    const existingUsername = await db.users.findByEmailOrUsername(username);
-
-    if (existingUser) {
+    // Check if email already exists
+    const existingEmail = await db.users.findByEmailOrUsername(email);
+    if (existingEmail && existingEmail.email === email) {
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: 'Email already exists. Please use a different email.' },
         { status: 409 }
       );
     }
 
-    if (existingUsername) {
+    // Check if username already exists
+    const existingUsername = await db.users.findByEmailOrUsername(username);
+    if (existingUsername && existingUsername.username === username) {
       return NextResponse.json(
-        { error: 'Username already taken' },
+        { error: 'Username already exists. Please choose a different one.' },
         { status: 409 }
       );
     }
