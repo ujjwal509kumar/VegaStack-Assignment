@@ -95,7 +95,7 @@ EMAIL_PASSWORD=
 EMAIL_FROM=
 
 # Application URL
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=
 ```
 
 4. Set up Supabase database
