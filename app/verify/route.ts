@@ -4,66 +4,75 @@ import { supabaseAdmin } from '@/lib/supabase';
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url);
   const token = requestUrl.searchParams.get('token');
-  const type = requestUrl.searchParams.get('type');
   
   // Get the base URL - use the request origin to ensure correct domain
   const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
 
-  if (!token || !type) {
+  if (!token) {
     return NextResponse.redirect(
-      new URL('/login?error=invalid_link&message=Missing token or type', baseUrl)
+      new URL('/login?error=invalid_link&message=Missing verification token', baseUrl)
     );
   }
 
-  // Handle different verification types
-  if (type === 'recovery') {
-    // Password reset - just pass through to reset page
-    // Token will be validated when user submits the form
-    const resetUrl = new URL('/auth/reset-password', baseUrl);
-    resetUrl.searchParams.set('token', token);
-    resetUrl.searchParams.set('type', 'recovery');
-    
-    return NextResponse.redirect(resetUrl);
-  } else if (type === 'signup' || type === 'email') {
-    // Email verification - verify immediately
-    try {
-      const { data, error } = await supabaseAdmin.auth.verifyOtp({
-        token_hash: token,
-        type: type as any,
-      });
+  try {
+    // Decode custom token (format: base64(userId:timestamp))
+    const decoded = Buffer.from(token, 'base64').toString('utf-8');
+    const [userId, timestamp] = decoded.split(':');
 
-      if (error) {
-        const errorMessage = error.message.includes('expired') 
-          ? 'This link has expired. Please request a new one.'
-          : error.message;
-        
-        return NextResponse.redirect(
-          new URL(`/login?error=verification_failed&message=${encodeURIComponent(errorMessage)}`, baseUrl)
-        );
-      }
-
-      if (!data?.user) {
-        return NextResponse.redirect(
-          new URL('/login?error=verification_failed&message=Invalid verification token', baseUrl)
-        );
-      }
-
-      // Update email verification status
-      await supabaseAdmin
-        .from('users')
-        .update({ email_verified: true })
-        .eq('email', data.user.email);
-
+    if (!userId || !timestamp) {
       return NextResponse.redirect(
-        new URL('/login?verified=true&message=Email verified successfully! You can now log in.', baseUrl)
-      );
-    } catch (err: any) {
-      console.error('Verification error:', err);
-      return NextResponse.redirect(
-        new URL(`/login?error=verification_failed&message=${encodeURIComponent(err.message || 'Verification failed')}`, baseUrl)
+        new URL('/login?error=verification_failed&message=Invalid verification token', baseUrl)
       );
     }
-  }
 
-  return NextResponse.redirect(new URL('/login', baseUrl));
+    // Check if token is expired (24 hours)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+    if (tokenAge > maxAge) {
+      return NextResponse.redirect(
+        new URL('/login?error=verification_failed&message=This link has expired. Please request a new one.', baseUrl)
+      );
+    }
+
+    // Verify user exists and update email_verified status
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, email, email_verified')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return NextResponse.redirect(
+        new URL('/login?error=verification_failed&message=User not found', baseUrl)
+      );
+    }
+
+    // Check if already verified
+    if (user.email_verified) {
+      return NextResponse.redirect(
+        new URL('/login?verified=true&message=Email already verified! You can log in.', baseUrl)
+      );
+    }
+
+    // Update email verification status
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({ email_verified: true })
+      .eq('id', userId);
+
+    if (updateError) {
+      return NextResponse.redirect(
+        new URL('/login?error=verification_failed&message=Failed to verify email', baseUrl)
+      );
+    }
+
+    return NextResponse.redirect(
+      new URL('/login?verified=true&message=Email verified successfully! You can now log in.', baseUrl)
+    );
+  } catch (err: any) {
+    return NextResponse.redirect(
+      new URL(`/login?error=verification_failed&message=${encodeURIComponent(err.message || 'Verification failed')}`, baseUrl)
+    );
+  }
 }
