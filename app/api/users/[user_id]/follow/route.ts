@@ -30,11 +30,15 @@ async function followHandler(
 
     await db.follows.follow(currentUserId, targetUserId);
 
+    // Get current user info for notification
+    const currentUser = await db.users.findById(currentUserId);
+    const userName = currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'Someone';
+
     // Create notification for followed user
     await db.notifications.create({
       userId: targetUserId,
       type: 'FOLLOW',
-      message: `Someone started following you`,
+      message: `${userName} started following you`,
       relatedId: currentUserId,
     });
 

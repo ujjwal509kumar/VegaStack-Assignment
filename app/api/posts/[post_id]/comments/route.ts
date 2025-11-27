@@ -69,10 +69,14 @@ async function addCommentHandler(
 
     // Create notification for post author
     if (post.author_id !== req.user!.userId) {
+      // Get current user info for notification
+      const currentUser = await db.users.findById(req.user!.userId);
+      const userName = currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'Someone';
+
       await db.notifications.create({
         userId: post.author_id,
         type: 'COMMENT',
-        message: `Someone commented on your post`,
+        message: `${userName} commented on your post`,
         relatedId: post_id,
       });
     }

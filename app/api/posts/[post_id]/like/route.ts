@@ -34,10 +34,14 @@ async function likeHandler(
 
       // Create notification for post author
       if (post.author_id !== userId) {
+        // Get current user info for notification
+        const currentUser = await db.users.findById(userId);
+        const userName = currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'Someone';
+
         await db.notifications.create({
           userId: post.author_id,
           type: 'LIKE',
-          message: `Someone liked your post`,
+          message: `${userName} liked your post`,
           relatedId: postId,
         });
       }
