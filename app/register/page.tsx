@@ -48,7 +48,9 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Registration failed');
+        const errorMessage = data.error || 'Registration failed';
+        setError(errorMessage);
+        toast.error(errorMessage);
         setLoading(false);
         return;
       }
@@ -186,6 +188,12 @@ export default function RegisterPage() {
                   </div>
                   <p className="text-xs text-muted-foreground">Min 8 chars, 1 uppercase, 1 lowercase, 1 number</p>
                 </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  </div>
+                )}
 
                 <Button
                   type="submit"
